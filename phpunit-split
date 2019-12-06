@@ -1,0 +1,34 @@
+#!/bin/sh
+PHPUNIT_TEMPLATE="phpunit.xml"
+TEST_SPLIT_COUNT=5
+
+/usr/bin/find class -type f -name '*Test.php*' > test.list
+/usr/bin/find class -type f -not -name '*Test.php*' > base_class.list
+TEST_CLASS_COUNT=$(/usr/bin/expr $(/bin/cat test.list | /usr/bin/wc -l) / $TEST_SPLIT_COUNT)
+for i in `/usr/bin/seq 1 $TEST_SPLIT_COUNT`
+do
+    /usr/bin/split -l $TEST_CLASS_COUNT --numeric-suffixes=1 -a 1 test.list test.list_
+done
+
+for i in $(/usr/bin/seq 1 $TEST_SPLIT_COUNT)
+do
+    # phpunit.xml
+    REPLACED_XML_FILE=${PHPUNIT_TEMPLATE%.xml}_$i.xml
+    /bin/cp $PHPUNIT_TEMPLATE $REPLACED_XML_FILE
+
+    #sudo apt-get install xmlstarlet
+    /usr/bin/xmlstarlet ed --inplace --delete "/phpunit/testsuite/directory" $REPLACED_XML_FILE
+
+    /bin/cat test.list_$i | while read line
+    do
+        /usr/bin/xmlstarlet ed --inplace --subnode "/phpunit/testsuite" -t elem -n directory -v "$line" $REPLACED_XML_FILE
+    done
+    /bin/cat base_class.list | while read line
+    do
+        /usr/bin/xmlstarlet ed --inplace --subnode "/phpunit/testsuite" -t elem -n directory -v "$line" $REPLACED_XML_FILE
+    done
+done
+
+/bin/rm test.list
+/bin/rm test.list_*
+/bin/rm base_class.list
